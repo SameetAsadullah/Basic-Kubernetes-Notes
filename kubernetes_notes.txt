@@ -1,0 +1,317 @@
+- Video Link: https://www.youtube.com/watch?v=X48VuDVv0do&ab_channel=TechWorldwithNana
+
+--------------------------------- MAIN COMPONENTS ---------------------------------
+- Pod:
+	- Smallest unit of Kubernetes
+	- Abstraction over container. Container is the same as docker container
+	- Usually 1 Application/Container per Pod
+	- Each Pod gets its own IP address (private). Can use it to communicate between Pods/Applications/Containers.
+	- New IP address is assigned on recreation (if container/application gets crashes). To avoid IP changing while communication, we use Service.
+
+- Service:
+	- Permanent/Static IP Address.
+	- It also balances the load between all the pods connected to a same service.
+	- Lifecycle of Pod and Service is not connected. Even if Pod dies, Service remains in working state.
+	- In configuration file, 'port' defines internal port of the service.
+	- In configuration file, 'targetPort' defines port of the container.
+
+- External Service:
+	- This IP Address is open to the public request.
+	- Syntax: http://{ip}:{PORT} (This can be used for testing but not for the end products. We use Ingress to solve this issue).
+	- It also balances load.
+	- You also give 'NodePort' in the configuration file which is the external port on which it will listen (you can send request to that port using browser).
+		- Range of Port allowed: 30000 - 32767
+
+- Ingress:
+	- It gives us the unique domain name and url of the Api that we can hit and then it does forwarding of the request to the external/internal service (make it internal when using with ingress).
+
+- ConfigMap:
+	- External configuration of your application.
+	- For Example, you stored url of the db pod in the image of your main application pod. Now, url changed, so you will have to build the image again.
+	- To avoid the above issue, you store that stuff in ConfigMap and attach it to your Pod. Pod will now get data from this ConfigMap.
+	- It's not a good way to store username or passwords in ConfigMap as it is open to anyone. You use Secret instead.
+	- Use it as environment variables or as a properties file inside the Pod.
+
+- Secret:
+	- Same as ConfigMap and is used to store secret data.
+	- It is not stored in plain text format but in base64 encoded format.
+	- Use it as environment variables or as a properties file inside the Pod.
+
+- Volumes:
+	- Kubernetes does not manage data persistence.
+	- If the data is stored in the pod/container then when it restarts, all the data will be lost. To solve this, we use Volumes.
+	- Now you attach physical storage or some remote storage with the pod. Data will not be lost even the pod/container gets restarted.
+
+- Deployment and StatefulSet (Pod Blueprints):
+	- Deployment is an abstraction of top of Pods. You don't create Pods yourself but instead you create and define deployments and tell it to create/replicate/scale-up/scale-down the Pods whenever necessary and to what extent.
+	- If one Pod dies, deployment will automatically replicate it and that will give no downtime to users.
+	- Deployment is for stateless applications/pods.
+	- You create statefulSet for applications/pods which have states i.e., databases like mongodb or mysql.
+	- Reason behind maintaining states for databases is that the storage can't be replicated for each pod. Each pod needs to access and store in the same storage.
+	- StatefulSet is then responsible for creating/replicating/scaling-up/scaling-down the databases pods.
+	- Implementing StatefulSet is not easy that is why it is recommended to host databases outside of Kubernetes cluster and just attach it with the cluster.
+
+
+------------------------------- KUBERNETES ARCHITECTURE -------------------------------
+- Worker Machine:
+	- It has container runtime, kubelet, and kubeproxy installed in it.
+	- Usually a cluster has multiple worker machines/nodes.
+	- Communication between workers is done by using services. Load balancing is done through services and kubeprox.
+	- It needs more resources as it does all the processing and working.
+
+- Container Runtime:
+	- It manages containers i.e., docker.
+
+- Kubelet:
+	- It interacts with the container runtime and the node (machine).
+	- It is responsible for starting the pod with a container inside and allocating resources to it i.e., cpu and memory,
+
+- Kubeproxy:
+	- It reduces request overhead by intelligently forwarding the request wherever needed.
+	- For example, it will forward the request of the pod to access db which is on the same machine/node and not on any other node. This will reduce request overhead from pod to database.
+
+- Master processes:
+	- It has Api Server which receives the requests for creating/querying the pods. It is a cluster gateway and it also acts as a gatekeeper for authentication.
+	- Then the request moves on to the Scheduler. It decides where to create a pod i.e., on which worker machine. It intelligently decides that by checking the resource usage and availability of all the worker machines.
+		- Kubelet which is installed on the worker machine gets the request of creating/restarting pod from the scheduler and executes it.
+	- Controller manager detects cluster state changes. If any pod dies, it detects and makes a request to the scheduler to recreate the pod (scheduler again checks resources and asks kubelet to restart the died pod).
+	- etcd is a key-value store of a cluster state. It is actually a cluster brain. Every change in the cluster is stored in it i.e., which pod died, how many resources of workers have been utilised etc. Each service above uses etcd to get all the data of the cluster.
+		- Database storage is not stored in etcd.
+	- Master node is very crucial as it handles everything in the cluster. That is why we always have multiple master nodes where Api Server does the load balancing and etcd forms distributed storage across all the master nodes.
+	- It doesn't need much resources as there is no load or processing here.
+	- There should be at least 2 master nodes in production environment.
+
+- You can add more masters and worker nodes if the demand of application or resources required increases. It is pretty easy to add both. 
+	- You just install the required tools i.e., Api Server, Scheduler, Controller Manager, etcd and Container runtime, kubelet, kubeproxy on master and worker nodes respectively.
+
+
+------------------------------- MINIKUBE AND KUBECTL -------------------------------
+- Minikube:
+	- We can not run Kubernetes cluster on local machine as it required a lot of resources. So, Minikube is used for local testing where both master and node processes run on one node and you can run this node on your laptop using Virtual Box.
+	- We can use kubectl to send request to its Api Server.
+
+- Kubectl:
+	- Command line tool for Kubernetes cluster. Used to create/delete pods and other components.
+	- You can use three clients to send request to Api Server of Master node:
+		- UI Dashboard
+		- API
+		- Kubectl
+	- Kubectl is the most powerful of above three clients because by using it you can do anything that you want.
+	- We can use kubectl to communicate with any cluster i.e., cloud cluster, hybrid cluster, Minikube cluster etc.
+	- Some basic commands can be found here: https://bit.ly/3oZzuHY
+
+- Replicaset:
+	- It automatically gets created when you create a deployment. Then by using this replicaset, multiple replicas of pods get created automatically as desired.
+
+- Deployment manages a Replicaset - Replicates manages a Pod - Pod is an abstraction of container. Everything below Deployment is handled by Kubernetes.
+
+
+-------------------------- DEPLOYMENT CONFIGURATION FILE --------------------------
+- It has three parts:
+	- Metadata (name, labels of the deployment)
+	- Specification (of the deployment)
+	- Status (it compares the desired state of the cluster with the actual state and see if there needs any change - this is actually the self-healing feature that Kubernetes provides)
+		- For example, if the desired capacity is 2 but the actual capacity is 1 => that means that we need 1 more replica (one could be dead or not created yet)
+		- Kubernetes get this status data from etcd.
+		- It is automatically added when you create a deployment and pods start running.
+		- Kubernetes updates state continuously. 
+- 'template' inside 'spec' defines the configuration for pods. 
+- 'labels' and 'selectors' is used to establish connections (could be between deployment and service, or between deployment and its pods etc)
+	- 'labels' are key-value pair and it could be anything that you think of. They are defined in 'metadata' part.
+	- 'selectors' are used to establish link based on 'labels'. They are defined in 'spec' part. 
+	
+
+----------------------------------- NAMESPACES -----------------------------------
+- You can organise resources in namespaces.
+- It is a virtual cluster inside your Kubernetes cluster.
+- Kubernetes gives you four default clusters:
+	- default: Resources (deployments, replicasets, services, configmaps etc) that we create are located here if we don't create a separate namespace for it.
+	- kube-node-lease: It holds information about heartbeats of nodes. Each node has a separate lease object in this namespace which determines its availability.
+	- cube-public: It has publicly accessible data. A configmap, which contains cluster information. You can access it without authentication.
+	- cube-system: It is not meant for our own use. Do not create or modify anything in kube-system. System processes, Master and Kubectl processes are deployed in it.
+- Another namespace named Kubernetes dashboard: it comes with mini-cube. You will not find it in your own cluster.
+- We can create our own namespace either using its command or by a configuration file. Configuration file is a better option.
+- We shouldn't use namespaces for smaller projects which has upto 10 users.
+- Use-Cases of namespaces:
+	- If we dont use it for bigger projects then every resource will be created in default namespace and soon it will be so congested to search or find out anything in it. Create separate namespace for every group i.e., database, monitoring, logging etc.
+	- If a cluster is being used by multiple teams and everything is in default namespace then there is a chance that you accidentally create multiple resources with the same name. That would overwrite the older resources.
+	- You can group common stuff in separate namespace and the other namespaces can use them. This can save us from creating multiple clusters. 
+		- For example, rather than creating two clusters for staging and development that uses the same database, create one cluster with three namespaces: staging, development, database => this way staging and development will be able to communicate with the same database.
+	- Resource sharing (Blue/Green Deployment): You can create multiple productions in one cluster which uses the same resources. Blue namespace that is in production now and green namespace that will be in production later.
+	- Access and Resource limits: If there are multiple teams and you don't want them to see each-other's data. You can create namespaces and assign them to their specific team. This way they won't be able to see other team's data.
+	- You can also limit cpu, ram, storage that the namespace can use. Only give resources that are required by the namespaces. (Resource Quotas)
+- Characteristics of namespaces:
+	- You can not access configmap or secret of one namespace in another namespace. You will have to create the same configmap or secret in all namespaces. Then those namespaces can get data from them i.e., database service url, and can connect to it.
+	- You can access service in another namespace. That's how you will be able to access database service in above point by getting its url from configmap. You will have to add name of namespace of database service to access it.
+		- For example, db_url: mysql-service.database. Here 'database' is the name of namespace.
+	- You can not put some resources in a namespace i.e., persistent volume, node.
+	- You can create resources in a namespace by mentioning the namespace name in kubectl command or in 'metadata => namespace' key in the configuration file and then apply it.
+	- You can avoid writing namespace in all commands or files if you are changing your resources from no-namespace to namespace. You can just change the active namespace and then everything will be created in it automatically. You can do it using kubens (Kubectx).
+
+
+----------------------------------- INGRESS -----------------------------------
+- You define rules in Ingress configuration file regarding where to forward the requests received on the hostname provided.
+- You need an implementation for Ingress which is Ingress Controller.
+- Ingress Controller evaluates and processes Ingress rules. It manages redirections. It is basically the entrypoint to cluster.
+- Kubernetes provides one controller itself named as "Kubernetes Nginx Ingress Controller". There are many other third party controllers as well. You need to install it.
+- Request gets received at Ingress controller => Ingress controller forwards it to ingress => ingress forwards it to the service of the application
+
+
+------------------------------------ HELM ------------------------------------
+- Package manager for Kubernetes. It contains all packages i.e., yaml files, statefulset etc.
+- Helm Chart: Bundle of YAML files
+	- You can create your own chart and push it to helm repository for later use or for public use.
+	- You can download from Helm Hub and use charts created by other users as well. You can search using command "helm search <keyword>" as well.
+- You can use it as a templating engine for yaml files. You can make a generic yaml file with placeholders in it. Values of those placeholders can be fetched from another file named 'values.yaml'.
+	- This way you avoid writing multiple configuration files and only write one.
+	- This is important if you use CI/CD tool for deployments.
+- With Helm, same application can be deployed in a second in multiple environments i.e., staging, development, production.
+- Helm Chart Structure:
+	- mychart/
+		- Chart.yaml: meta info about chart i.e., name, dependencies, version 
+ 		- values.yaml: values for the template files (default values that we can override if we want to)
+		- charts/: folder containing chart dependencies inside. If this chart depends on other charts then those charts will be stored here.
+		- templates/: the actual template files.
+		- ...: readme file, license file etc
+	- command to run it: helm install <chartname>
+- Release Management: Whenever something gets updated, help keeps its older version as well. You can roll back if you want to.
+
+
+----------------------------- KUBERNETES VOLUMES -----------------------------
+- Persistent Volume (PV):
+ 	- Can be physical (nfs, local etc) - they don't survive cluster crashes that's why always use remote/cloud storage. They can survive pod crashes only.
+	- Can be cloud
+	- both will have their own keywords in yaml file to get the access
+	- they are not namespaced - accessible to whole cluster	(can not be tied to 1 specific node as well)
+	- YAML File for its configuration.
+
+- Persistent Volume Claim (PVC):
+	- Middleware between application and persistent volumes.
+	- Whichever PV matches the requirements mentioned in PVC, it claims that PV and attach it with the application.
+	- You also need to mention PVC name in Pod's yaml file so that the containers in the pod access the PV successfully.
+	- YAML file for its configuration.
+	- PVCs should be in the same namespace as Pods.
+
+- It gets routed to a path specified in the configuration file pf Pod inside 'container' key.
+- ConfigMap and Secret can be attached to the pod as a volume as well. That way they get attached automatically when Pod restarts.
+- Storage Class: It creates PVs dynamically in the background. For complex projects, you might need a lot of PVs.
+	- configured using YAML file.
+	- 'provisioner' key is used to mention the type of cloud storage we will use.
+		- internal provisioner: starts with 'Kubernetes.io'
+		- external provisioner
+	- configure 'parameters' for storage we want to request for PV
+	- It is requested by PVC as well.
+		- 'storageClassName' attribute is used to define it in PVC.
+	- Pod will request storage form PVC, PVC will request it from Storage Class, Storage Class will create PVs through the specified provider.
+
+-------------------------------- STATEFULSET --------------------------------
+- Stateless Applications:
+	- Which do not save their state and is not dependent on state.
+	- Deployed using Deployments.
+	- Persistent Storage can be attached to these.
+	- For example: Pods of some java application handling user requests
+		- Can be created or deleted in any random way or at the same time
+		- Have random hashes in their names
+
+- Stateful Applications:
+	- Which save their state and is dependent on that.
+	- Deployed using StatefulSet.
+	- Persistent Storage can be attached to these as well.
+	- For example: Pods of mysql storage
+		- Can't be created or deleted at the same time
+		- Can't be randomly addressed by assigning random hashes in their names
+		- They are not identical. They have their own identity on top of their blueprint	
+	- Pod Identity:
+		- Sticky identity for each pod. For example, mysql-0 (this is always the master pod), mysql-1, mysql-2
+		- Created from same specification, but not interchangeable
+		- If one pod dies, new one doesn't get created randomly. It gets the same identity of last deleted pod.
+	- All pods can not write into the database. Only one pod can and it is called Master Pod; Others are called Worker/Slave Pods. Reading from database is allowed for all pods.
+		- All pods have their own temporary storage which is a replica of master pod's storage.
+		- They continuously synchronise the data with master pod.
+		- Whenever a new pod is added into the cluster, it replicates the data from its previous pod.
+		- If all pod dies, the data will be lost. This is why it is always better to use remote persistent storage with the pods.
+		- Next pod is only created, if previous is up and running.
+		- Deletion of pods happen in reverse order i.e., mysql-2 then mysql-1 and then mysql-0
+	- There are 2 endpoints for stateful pods:
+		- Load balancer service on top of all pods.
+		- Individual service name is also given to each pod
+			- Format: ${pod name}.${governing service domain}
+			- For example, mysql-0.svc2, mysql-1.svc2, mysql-2.svc2
+	- Two characteristics of stateful pods:
+		- Predictable pod name. For example, mysql-0
+		- Fixed individual DNS name. For example, mysql-2.svc2
+	- When stateful pod restarts:
+		- Its IP address changes
+		- Name and endpoint stays the same
+		- That's why they are called that they have sticky identity:
+			- They retain state
+			- They retain role
+	- Replicating stateful apps is complex. They are not perfect for containerised environments.
+
+
+-------------------------------- SERVICES --------------------------------
+- Each pod has its own IP address and the pods are destroyed and created very frequently.
+	- When one pod gets destroyed and a new one gets created, their IP address changes. We can't update new IPs every time.
+	- So, we use service on top of pods and we communicate with that service.
+
+- Pod gets its IP from the range of IP that is assigned to the Node.
+
+- Service:
+	- Has stable IP address
+	- Also does loadbalancing
+	- Provides loose coupling
+	- Can be used to communicate within and outside cluster
+
+- Types of service:
+	- ClusterIP Services (Most common one):
+		- Default type service (when you don't mention any type in service yaml file while creating it)
+		- You forward and map requests based on ports.
+		- Multi-Port Services:
+			- You can also open multiple ports on a service to direct the requests to different applications.
+	- Headless Services:
+		- Used when client wants to communicate with 1 specific Pod directly.
+		- Used when pods want to talk directly with specific Pod
+		- Use Case: Stateful application, like databases where Pod replicas are not identical.
+			- When new pod wants to communicate specifically with the previous pod for data replication
+			- When all pods want to communicate with the Master pod for data synchronisation or data writing
+		- Two options to get the specific IP address of Pod:
+			- API call to Kubernetes API Server:
+				- Makes app too tied to Kubernetes API
+				- Inefficient
+				- So, not a good option
+			- DNS Lookup:	
+				- DNS lookup for ClusterIP Service returns single IP address of the service
+					- But if you set 'clusterIP' attribute to 'None' in specification part then it will become a headless service
+					- Then it will return IP addresses of the Pods
+					- This way the client can find out the IP easily and communicate directly with whichever pod it wants to communicate
+					- There will be no IP assigned to service now
+		-  For stateful applications, we always have both services i.e., ClusterIP and Headless service.
+			- For handling normal client requests, we use ClusterIP Service.
+			- For specific communication, we use Headless Service.
+
+- Three service type attributes:
+	- ClusterIP:
+		- Default, specifying type not needed
+		- Internal Service
+	- NodePort:
+		- External service
+		- Static IP address
+		- Can be accessed from browser
+		- No Ingress needed
+		- When we Crete a NodePort service, a ClusterIP Service to which the 'nodePort' will route is automatically created.
+			- For example, 'port: 3200', 'nodePort: 30008' => the routing from nodePort to port will be managed by automatically created ClusterIP service.
+				- cluster-ip:3200
+				- node-ip:30008
+		- External IP is not assigned to this service
+		- Not safe because the external clients will have access to all the ports and worker nodes IPs
+		- It is an extension of ClusterIP Service
+	- LoadBalancer:
+		- Becomes accessible externally through cloud providers LoadBalancer i.e., GCP, AWS, Azure
+		- When we create this service, ClusterIP service and NodePort service is automatically created to which the cloud provider load balancer will route the traffic to.
+		- Entrypoint is load balancer now. It directs to traffic to NodePort Service and that directs the traffic to ClusterIP service and that directs the traffic to Pods.
+		- External IP is assigned to the service.
+		- It is an extension of NodePort Service
+
+- For production environment:
+	- You will either use ClusterIP Service with Ingress
+	- Or ClusterIP Service with LoadBalancer
