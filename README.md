@@ -1,2 +1,2 @@
-<h1 align="center">Basic Kubernetes Notes</h1>
+# Basic Kubernetes Notes
 Notes of basics of Kubernetes.
